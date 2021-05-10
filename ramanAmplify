@@ -1,0 +1,105 @@
+%% 拉曼放大最简化模型计算
+% 注意测试激光功率，避免烧伤光电探测器
+% 主要噪声，后向瑞利散射噪声（放大），ASE噪声
+%% 双向双信号模拟
+c=3e8;
+PumpLambda=1450e-9;
+PumpF=c/PumpLambda;
+omegaPumpF=2*pi*PumpF;
+SignalLambda=1550e-9;
+SignalF=c/SignalLambda;
+omegaSignalF=2*pi*omegaPumpF;
+Pp=-30;% 单位mW
+Pr=31.5;% 单位mW
+alpha_p=0.23;%入射光衰减系数
+alpha_r=0.24;%拉曼泵浦光衰减系数
+g_r=1.62;%拉曼增益
+PP=10^(Pp/10);
+PR=10^(Pr/10);
+u=0;
+v=0;
+SignalPower=0.1;
+PumpPower=128;
+distance=140;
+%% 单路信号放大情况模拟
+while (1)
+PP1=SignalPower;
+PP2=v;
+PR1=PumpPower;
+PR2=u;
+alpha_P=log(10)*alpha_p/10;
+alpha_R=log(10)*alpha_r/10;
+g_R=1000*log(10)*g_r/10;
+opts = odeset('RelTol',1e-3);
+[z,p] = ode45(@ramanPump, [0,distance], [PP1;PP2;PR1;PR2],opts);
+if abs(p(end,4)-PumpPower)<0.01*PumpPower
+break;
+end
+u=u+0.001*(PumpPower-p(end,4)); 
+end
+v=0;
+i=0;
+%% test计算
+% PP1=0.1;
+% PP2=10;
+% PR1=200;
+% PR2=0; 
+% opts = odeset('RelTol',1e-4);
+% [z,p] = ode45(@ramanPump, [0,50], [PP1;PP2;PR1;PR2],opts);
+%% 双路双向放大迭代开始
+while(1)
+    i=i+1;
+    if(mod(i,1000)==0)
+        disp(i)
+    end
+ PP1=SignalPower;
+PP2=v;
+PR1=PumpPower;
+PR2=u; 
+opts = odeset('RelTol',1e-3);
+[z,p] = ode45(@ramanPump, [0,distance], [PP1;PP2;PR1;PR2],opts);
+
+if (abs(p(end,4)-PumpPower)<0.01*PumpPower)&&(abs(p(end,2)-SignalPower)<0.01*SignalPower)
+    break;
+end
+
+if abs(p(end,4)-PumpPower)>0.01*PumpPower
+    u=u+0.01*(PumpPower-p(end,4));
+end
+
+if abs(p(end,2)-SignalPower)>0.01*SignalPower
+    v=v+0.01*(SignalPower-p(end,2));
+end
+
+end
+
+
+
+plot(z,p)
+disp(p(end,2))
+disp(p(end,4))
+% function Ourshoot
+% t0=0.5; tf=2; N=250; t=linspace(t0,tf,N);
+% y0=ExaSol(t0); % initial value for first equation
+% A1=3; y0(2)=A1; % initial guesses for second equation
+% yf0=ExaSol(tf); % get final point value
+% EPSShooting=10^-5; close all; figure; figure;
+% col=str2mat('b:','g:','c:','m:','k:','b--','g--','c--');
+% ya=ExaSol(t); figure(1); plot(t,ya(:,1),'r-'); hold on;
+% figure(2); plot(t,ya(:,2),'r-'); hold on;
+% for i=1:50, % maximum loop times
+%  [y,t]=Ourrk4([t0,tf],y0,N);%y0(2) is modified each loop
+%  if i==1,
+%  yf1=y(end,2); %get last point value for second equation
+%  flagEPS=abs((y(end,:)-yf0)./yf0); % relative error
+%  A2=yf0(2).*A1./yf1; y0(2)=A2; % y0(2) is modified
+%  else
+%  yf2=y(end,2); %get last point value for second equation
+%  flagEPS=abs((y(end,:)-yf0)./yf0); % relative error
+%  A3=A1+(A2-A1)*(yf0(2)-yf1)/(yf2-yf1);
+%  A1=A2; A2=A3; yf1=yf2; y0(2)=A2; % y0(2) is modified
+%  end
+%  figure(1); plot(t,y(:,1),col(i,:)); hold on;
+%  figure(2); plot(t,y(:,2),col(i,:)); hold on;
+%  if all(flagEPS<EPSShooting)==1, break; end
+% end 
